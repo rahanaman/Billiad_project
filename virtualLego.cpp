@@ -1,15 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-//
-// File: virtualLego.cpp
-//
-// Original Author: 박창현 Chang-hyeon Park, 
-// Modified by Bong-Soo Sohn and Dong-Jun Kim
-// 
-// Originally programmed for Virtual LEGO. 
-// Modified later to program for Virtual Billiard.
-//        
-////////////////////////////////////////////////////////////////////////////////
-
 #include "d3dUtility.h"
 #include <vector>
 #include <ctime>
@@ -40,6 +28,10 @@ D3DXMATRIX g_mProj;
 #define PI 3.14159265
 #define M_HEIGHT 0.01
 #define DECREASE_RATE 0.9982
+
+float dotProduction(D3DXVECTOR3& v1, D3DXVECTOR3& v2) {
+	return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+}
 
 // -----------------------------------------------------------------------------
 // CSphere class definition
@@ -125,14 +117,14 @@ public:
 
 			//correction of position of ball
 			// Please uncomment this part because this correction of ball position is necessary when a ball collides with a wall
-			/*if(tX >= (4.5 - M_RADIUS))
-				tX = 4.5 - M_RADIUS;
-			else if(tX <=(-4.5 + M_RADIUS))
-				tX = -4.5 + M_RADIUS;
-			else if(tZ <= (-3 + M_RADIUS))
-				tZ = -3 + M_RADIUS;
-			else if(tZ >= (3 - M_RADIUS))
-				tZ = 3 - M_RADIUS;*/
+			if(tX >= (4.5 - m_radius))
+				tX = 4.5 - m_radius;
+			else if(tX <=(-4.5 + m_radius))
+				tX = -4.5 + m_radius;
+			else if(tZ <= (-3 + m_radius))
+				tZ = -3 + m_radius;
+			else if(tZ >= (3 - m_radius))
+				tZ = 3 - m_radius;
 			
 			this->setCenter(tX, cord.y, tZ);
 		}
@@ -186,70 +178,84 @@ private:
 class CWall {
 
 private:
-	
-    float					m_x;
+
+	float					m_x;
 	float					m_z;
 	float                   m_width;
-    float                   m_depth;
+	float                   m_depth;
 	float					m_height;
-	
+	D3DXVECTOR3				m_dir;
+
 public:
-    CWall(void)
-    {
-        D3DXMatrixIdentity(&m_mLocal);
-        ZeroMemory(&m_mtrl, sizeof(m_mtrl));
-        m_width = 0;
-        m_depth = 0;
-        m_pBoundMesh = NULL;
-    }
-    ~CWall(void) {}
-public:
-    bool create(IDirect3DDevice9* pDevice, float ix, float iz, float iwidth, float iheight, float idepth, D3DXCOLOR color = d3d::WHITE)
-    {
-        if (NULL == pDevice)
-            return false;
-		
-        m_mtrl.Ambient  = color;
-        m_mtrl.Diffuse  = color;
-        m_mtrl.Specular = color;
-        m_mtrl.Emissive = d3d::BLACK;
-        m_mtrl.Power    = 5.0f;
-		
-        m_width = iwidth;
-        m_depth = idepth;
-		
-        if (FAILED(D3DXCreateBox(pDevice, iwidth, iheight, idepth, &m_pBoundMesh, NULL)))
-            return false;
-        return true;
-    }
-    void destroy(void)
-    {
-        if (m_pBoundMesh != NULL) {
-            m_pBoundMesh->Release();
-            m_pBoundMesh = NULL;
-        }
-    }
-    void draw(IDirect3DDevice9* pDevice, const D3DXMATRIX& mWorld)
-    {
-        if (NULL == pDevice)
-            return;
-        pDevice->SetTransform(D3DTS_WORLD, &mWorld);
-        pDevice->MultiplyTransform(D3DTS_WORLD, &m_mLocal);
-        pDevice->SetMaterial(&m_mtrl);
-		m_pBoundMesh->DrawSubset(0);
-    }
-	
-	bool hasIntersected(CSphere& ball) 
+	CWall(void)
 	{
+		D3DXMatrixIdentity(&m_mLocal);
+		ZeroMemory(&m_mtrl, sizeof(m_mtrl));
+		m_width = 0;
+		m_depth = 0;
+		m_pBoundMesh = NULL;
+	}
+	~CWall(void) {}
+public:
+	bool create(IDirect3DDevice9* pDevice, float ix, float iz, float iwidth, float iheight, float idepth, D3DXCOLOR color = d3d::WHITE)
+	{
+		if (NULL == pDevice)
+			return false;
+
+		m_mtrl.Ambient = color;
+		m_mtrl.Diffuse = color;
+		m_mtrl.Specular = color;
+		m_mtrl.Emissive = d3d::BLACK;
+		m_mtrl.Power = 5.0f;
+
+		m_width = iwidth;
+		m_depth = idepth;
+
+		if (FAILED(D3DXCreateBox(pDevice, iwidth, iheight, idepth, &m_pBoundMesh, NULL)))
+			return false;
+		return true;
+	}
+	void destroy(void)
+	{
+		if (m_pBoundMesh != NULL) {
+			m_pBoundMesh->Release();
+			m_pBoundMesh = NULL;
+		}
+	}
+	void draw(IDirect3DDevice9* pDevice, const D3DXMATRIX& mWorld)
+	{
+		if (NULL == pDevice)
+			return;
+		pDevice->SetTransform(D3DTS_WORLD, &mWorld);
+		pDevice->MultiplyTransform(D3DTS_WORLD, &m_mLocal);
+		pDevice->SetMaterial(&m_mtrl);
+		m_pBoundMesh->DrawSubset(0);
+	}
+
+	bool hasIntersected(CSphere& ball)
+	{
+
+		D3DXVECTOR3 pos = ball.getCenter();
+		float rad = ball.getRadius();
+		
+
+		double vel_x = ball.getVelocity_X();
+		double vel_z = ball.getVelocity_Z();
 		// Insert your code here.
 		return false;
 	}
 
-	void hitBy(CSphere& ball) 
+	void hitBy(CSphere& ball)
 	{
+		D3DXVECTOR3 pos = ball.getCenter() - getPositionVector();
+		float rad = ball.getRadius();
+
+
+		double vel_x = ball.getVelocity_X();
+		double vel_z = ball.getVelocity_Z();
 		// Insert your code here.
-	}    
-	
+	}
+
 	void setPosition(float x, float y, float z)
 	{
 		D3DXMATRIX m;
@@ -259,17 +265,24 @@ public:
 		D3DXMatrixTranslation(&m, x, y, z);
 		setLocalTransform(m);
 	}
-	
-    float getHeight(void) const { return M_HEIGHT; }
-	
-	
-	
-private :
-    void setLocalTransform(const D3DXMATRIX& mLocal) { m_mLocal = mLocal; }
-	
+
+	float getHeight(void) const { return M_HEIGHT; }
+
+	D3DXVECTOR3 getPositionVector(float x, float y, float z){
+		D3DXVECTOR3 pos;
+		pos.x = x;
+		pos.y = y;
+		pos.z = z;
+		return pos;
+	}
+
+
+private:
+	void setLocalTransform(const D3DXMATRIX& mLocal) { m_mLocal = mLocal; }
+
 	D3DXMATRIX              m_mLocal;
-    D3DMATERIAL9            m_mtrl;
-    ID3DXMesh*              m_pBoundMesh;
+	D3DMATERIAL9            m_mtrl;
+	ID3DXMesh* m_pBoundMesh;
 };
 
 // -----------------------------------------------------------------------------
@@ -393,13 +406,15 @@ bool Setup()
     g_legoPlane.setPosition(0.0f, -0.0006f / 5, 0.0f);
 	
 	// create walls and set the position. note that there are four walls
+	//긴쪽 벽
 	if (false == g_legowall[0].create(Device, -1, -1, 9, 0.3f, 0.12f, d3d::DARKRED)) return false;
 	g_legowall[0].setPosition(0.0f, 0.12f, 3.06f);
 	if (false == g_legowall[1].create(Device, -1, -1, 9, 0.3f, 0.12f, d3d::DARKRED)) return false;
 	g_legowall[1].setPosition(0.0f, 0.12f, -3.06f);
+	//짧은 쪽 벽
 	if (false == g_legowall[2].create(Device, -1, -1, 0.12f, 0.3f, 6.24f, d3d::DARKRED)) return false;
 	g_legowall[2].setPosition(4.56f, 0.12f, 0.0f);
-	if (false == g_legowall[3].create(Device, -1, -1, 0.12f, 0.3f, 6.24f, d3d::DARKRED)) return false;
+	if (false == g_legowall[3].create(Device, -1, -1, .12f, 0.3f, 6.24f, d3d::DARKRED)) return false;
 	g_legowall[3].setPosition(-4.56f, 0.12f, 0.0f);
 
 	// create four balls and set the position
@@ -603,13 +618,16 @@ LRESULT CALLBACK d3d::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	return ::DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
+//Window Api의 메인 진입점
 int WINAPI WinMain(HINSTANCE hinstance,
 				   HINSTANCE prevInstance, 
 				   PSTR cmdLine,
 				   int showCmd)
 {
+	//랜덤 함수 초기화
     srand(static_cast<unsigned int>(time(NULL)));
 	
+	//direct X 초기화
 	if(!d3d::InitD3D(hinstance,
 		Width, Height, true, D3DDEVTYPE_HAL, &Device))
 	{
@@ -617,14 +635,17 @@ int WINAPI WinMain(HINSTANCE hinstance,
 		return 0;
 	}
 	
+	//SetUp
 	if(!Setup())
 	{
 		::MessageBox(0, "Setup() - FAILED", 0, 0);
 		return 0;
 	}
 	
+	//frame 단위 루프
 	d3d::EnterMsgLoop( Display );
 	
+	//destroy
 	Cleanup();
 	
 	Device->Release();
