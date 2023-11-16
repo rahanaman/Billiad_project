@@ -93,13 +93,22 @@ public:
 	
     bool hasIntersected(CSphere& ball) 
 	{
-		// Insert your code here.
+		D3DXVECTOR3 pos1 = ball.getCenter();
+		D3DXVECTOR3 pos2 = getCenter();
+		float dis = (pos1.x - pos2.x) * (pos1.x - pos2.x) + (pos1.y - pos2.y) * (pos1.y - pos2.y) + (pos1.z - pos2.z) * (pos1.z - pos2.z);
+		return dis * dis > (m_radius + ball.getRadius()) * (m_radius + ball.getRadius()) ? false : true;
 
-		return false;
 	}
 	
 	void hitBy(CSphere& ball) 
 	{ 
+		if (hasIntersected(ball)) {
+			double vel_x = ball.getVelocity_X();
+			double vel_z = ball.getVelocity_Z();
+			ball.setPower(m_velocity_x,m_velocity_z);
+			setPower(vel_x, vel_z);
+		}
+
 		// Insert your code here.
 	}
 
@@ -184,6 +193,7 @@ private:
 	float                   m_width;
 	float                   m_depth;
 	float					m_height;
+	int						m_is_vertical;
 	D3DXVECTOR3				m_dir;
 
 public:
@@ -215,6 +225,15 @@ public:
 			return false;
 		return true;
 	}
+	void setVertical(bool isVertical) {
+		m_is_vertical = isVertical;
+	}
+
+	void setDirection(float x, float y, float z) {
+		m_dir.x = x;
+		m_dir.y = y;
+		m_dir.z = z;
+	}
 	void destroy(void)
 	{
 		if (m_pBoundMesh != NULL) {
@@ -234,26 +253,27 @@ public:
 
 	bool hasIntersected(CSphere& ball)
 	{
-
 		D3DXVECTOR3 pos = ball.getCenter();
 		float rad = ball.getRadius();
+		float dis;
+		dis = m_is_vertical ? pos.x - m_x : pos.z - m_z;
 		
+		return dis * dis > rad * rad ? false : true;
 
-		double vel_x = ball.getVelocity_X();
-		double vel_z = ball.getVelocity_Z();
-		// Insert your code here.
-		return false;
+		
 	}
 
 	void hitBy(CSphere& ball)
 	{
-		D3DXVECTOR3 pos = ball.getCenter() - getPositionVector();
-		float rad = ball.getRadius();
+		if (hasIntersected(ball)) {
+			double vel_x = ball.getVelocity_X();
+			double vel_z = ball.getVelocity_Z();
+			if (m_is_vertical) ball.setPower(-vel_x,vel_z);
+			else ball.setPower(vel_x,-vel_z);
+		}
 
 
-		double vel_x = ball.getVelocity_X();
-		double vel_z = ball.getVelocity_Z();
-		// Insert your code here.
+		
 	}
 
 	void setPosition(float x, float y, float z)
@@ -268,13 +288,7 @@ public:
 
 	float getHeight(void) const { return M_HEIGHT; }
 
-	D3DXVECTOR3 getPositionVector(float x, float y, float z){
-		D3DXVECTOR3 pos;
-		pos.x = x;
-		pos.y = y;
-		pos.z = z;
-		return pos;
-	}
+
 
 
 private:
@@ -409,13 +423,17 @@ bool Setup()
 	//긴쪽 벽
 	if (false == g_legowall[0].create(Device, -1, -1, 9, 0.3f, 0.12f, d3d::DARKRED)) return false;
 	g_legowall[0].setPosition(0.0f, 0.12f, 3.06f);
+	g_legowall[0].setVertical(false);
 	if (false == g_legowall[1].create(Device, -1, -1, 9, 0.3f, 0.12f, d3d::DARKRED)) return false;
 	g_legowall[1].setPosition(0.0f, 0.12f, -3.06f);
+	g_legowall[1].setVertical(false);
 	//짧은 쪽 벽
 	if (false == g_legowall[2].create(Device, -1, -1, 0.12f, 0.3f, 6.24f, d3d::DARKRED)) return false;
 	g_legowall[2].setPosition(4.56f, 0.12f, 0.0f);
+	g_legowall[2].setVertical(true);
 	if (false == g_legowall[3].create(Device, -1, -1, .12f, 0.3f, 6.24f, d3d::DARKRED)) return false;
 	g_legowall[3].setPosition(-4.56f, 0.12f, 0.0f);
+	g_legowall[3].setVertical(true);
 
 	// create four balls and set the position
 	for (i=0;i<4;i++) {
