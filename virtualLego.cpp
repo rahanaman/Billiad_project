@@ -299,6 +299,123 @@ private:
 	ID3DXMesh* m_pBoundMesh;
 };
 
+class CPanel { // 게임 받침대
+
+private:
+
+	float					m_x;
+	float					m_z;
+
+
+	float                   m_width;
+	float                   m_depth;
+	float					m_height;
+	int						m_is_vertical;
+	D3DXVECTOR3				m_dir;
+
+public:
+	CPanel(void)
+	{
+		D3DXMatrixIdentity(&m_mLocal);
+		ZeroMemory(&m_mtrl, sizeof(m_mtrl));
+		m_width = 0;
+		m_depth = 0;
+		m_pBoundMesh = NULL;
+	}
+	~CPanel(void) {}
+public:
+	bool create(IDirect3DDevice9* pDevice, float ix, float iz, float iwidth, float iheight, float idepth, D3DXCOLOR color = d3d::WHITE)
+	{
+		if (NULL == pDevice)
+			return false;
+
+		m_mtrl.Ambient = color;
+		m_mtrl.Diffuse = color;
+		m_mtrl.Specular = color;
+		m_mtrl.Emissive = d3d::BLACK;
+		m_mtrl.Power = 5.0f;
+
+		m_width = iwidth;
+		m_depth = idepth;
+
+		if (FAILED(D3DXCreateBox(pDevice, iwidth, iheight, idepth, &m_pBoundMesh, NULL)))
+			return false;
+		return true;
+	}
+	void setVertical(bool isVertical) {
+		m_is_vertical = isVertical;
+	}
+
+	void setDirection(float x, float y, float z) {
+		m_dir.x = x;
+		m_dir.y = y;
+		m_dir.z = z;
+	}
+	void destroy(void)
+	{
+		if (m_pBoundMesh != NULL) {
+			m_pBoundMesh->Release();
+			m_pBoundMesh = NULL;
+		}
+	}
+	void draw(IDirect3DDevice9* pDevice, const D3DXMATRIX& mWorld)
+	{
+		if (NULL == pDevice)
+			return;
+		pDevice->SetTransform(D3DTS_WORLD, &mWorld);
+		pDevice->MultiplyTransform(D3DTS_WORLD, &m_mLocal);
+		pDevice->SetMaterial(&m_mtrl);
+		m_pBoundMesh->DrawSubset(0);
+	}
+
+	bool hasIntersected(CSphere& ball)
+	{
+		D3DXVECTOR3 pos = ball.getCenter();
+		float rad = ball.getRadius();
+		float dis;
+		dis = m_is_vertical ? pos.x - m_x : pos.z - m_z;
+
+		return dis * dis > rad * rad ? false : true;
+
+
+	}
+
+	void hitBy(CSphere& ball)
+	{
+		if (hasIntersected(ball)) {
+			double vel_x = ball.getVelocity_X();
+			double vel_z = ball.getVelocity_Z();
+			if (m_is_vertical) ball.setPower(-vel_x, vel_z);
+			else ball.setPower(vel_x, -vel_z);
+		}
+
+
+
+	}
+
+	void setPosition(float x, float y, float z)
+	{
+		D3DXMATRIX m;
+		this->m_x = x;
+		this->m_z = z;
+
+		D3DXMatrixTranslation(&m, x, y, z);
+		setLocalTransform(m);
+	}
+
+	float getHeight(void) const { return M_HEIGHT; }
+
+
+
+
+private:
+	void setLocalTransform(const D3DXMATRIX& mLocal) { m_mLocal = mLocal; }
+
+	D3DXMATRIX              m_mLocal;
+	D3DMATERIAL9            m_mtrl;
+	ID3DXMesh* m_pBoundMesh;
+};
+
 // -----------------------------------------------------------------------------
 // CLight class definition
 // -----------------------------------------------------------------------------
@@ -420,12 +537,12 @@ bool Setup()
     g_legoPlane.setPosition(0.0f, -0.0006f / 5, 0.0f);
 	
 	// create walls and set the position. note that there are four walls
-	//긴쪽 벽
-	if (false == g_legowall[0].create(Device, -1, -1, 9, 0.3f, 0.12f, d3d::DARKRED)) return false;
-	g_legowall[0].setPosition(0.0f, 0.12f, 3.06f);
+	//위 아래 벽
+	if (false == g_legowall[0].create(Device, -1, -1, 6.24f, 0.3f, 0.12f, d3d::DARKRED)) return false;
+	g_legowall[0].setPosition(0.0f, 0.12f, 4.56f);
 	g_legowall[0].setVertical(false);
-	if (false == g_legowall[1].create(Device, -1, -1, 9, 0.3f, 0.12f, d3d::DARKRED)) return false;
-	g_legowall[1].setPosition(0.0f, 0.12f, -3.06f);
+	if (false == g_legowall[1].create(Device, -1, -1, 6.24f, 0.3f, 0.12f, d3d::DARKRED)) return false;
+	g_legowall[1].setPosition(0.0f, 0.12f, -4.56f);
 	g_legowall[1].setVertical(false);
 	//짧은 쪽 벽
 	if (false == g_legowall[2].create(Device, -1, -1, 0.12f, 0.3f, 6.24f, d3d::DARKRED)) return false;
@@ -577,6 +694,7 @@ LRESULT CALLBACK d3d::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 				break;
 
+			
 			}
 			break;
         }
@@ -589,45 +707,9 @@ LRESULT CALLBACK d3d::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			float dy;
 			
             if (LOWORD(wParam) & MK_LBUTTON) {
-				
-                if (isReset) {
-                    isReset = false;
-                } else {
-                    D3DXVECTOR3 vDist;
-                    D3DXVECTOR3 vTrans;
-                    D3DXMATRIX mTrans;
-                    D3DXMATRIX mX;
-                    D3DXMATRIX mY;
-					
-                    switch (move) {
-                    case WORLD_MOVE:
-                        dx = (old_x - new_x) * 0.01f;
-                        dy = (old_y - new_y) * 0.01f;
-                        D3DXMatrixRotationY(&mX, dx);
-                        D3DXMatrixRotationX(&mY, dy);
-                        g_mWorld = g_mWorld * mX * mY;
-						
-                        break;
-                    }
-                }
-				
-                old_x = new_x;
-                old_y = new_y;
+				//마우스 왼쪽 버튼
+                
 
-            } else {
-                isReset = true;
-				
-				if (LOWORD(wParam) & MK_RBUTTON) {
-					dx = (old_x - new_x);// * 0.01f;
-					dy = (old_y - new_y);// * 0.01f;
-		
-					D3DXVECTOR3 coord3d=g_target_blueball.getCenter();
-					g_target_blueball.setCenter(coord3d.x+dx*(-0.007f),coord3d.y,coord3d.z+dy*0.007f );
-				}
-				old_x = new_x;
-				old_y = new_y;
-				
-                move = WORLD_MOVE;
             }
             break;
         }
