@@ -41,10 +41,11 @@ private :
     float                   m_radius;
 	float					m_velocity_x;
 	float					m_velocity_z;
-	bool					isDeath;
 	bool					isMoving;
 
 public:
+
+	bool					isDeath;
     CSphere(void)
     {
         D3DXMatrixIdentity(&m_mLocal);
