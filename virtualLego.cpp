@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <cassert>
 
+#define NUMBER_OF_BALLS 9 // number of balls
+
 IDirect3DDevice9* Device = NULL;
 
 // window size
@@ -12,10 +14,10 @@ const int Width  = 1920;
 const int Height = 1080;
 
 // There are four balls
-// initialize the position (coordinate) of each ball (ball0 ~ ball3)
-const float spherePos[4][2] = { {-2.7f,0} , {+2.4f,0} , {3.3f,0} , {-2.7f,-0.9f}}; 
-// initialize the color of each ball (ball0 ~ ball3)
-const D3DXCOLOR sphereColor[4] = {d3d::RED, d3d::RED, d3d::YELLOW, d3d::WHITE};
+// initialize the position (coordinate) of each ball
+const float spherePos[NUMBER_OF_BALLS][2] = { {0,0},{-2,0},{0,-2},{-2,-2},{2,0},{0,2},{2,2},{-2,2},{2,-2} };
+// initialize the color of each ball
+const D3DXCOLOR sphereColor[NUMBER_OF_BALLS] = { d3d::YELLOW,d3d::RED,d3d::RED,  d3d::RED, d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED,d3d::RED };
 
 // -----------------------------------------------------------------------------
 // Transform matrices
@@ -29,10 +31,6 @@ D3DXMATRIX g_mProj;
 #define M_HEIGHT 0.01
 #define DECREASE_RATE 0.9992
 
-float dotProduction(D3DXVECTOR3& v1, D3DXVECTOR3& v2) {
-	return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-}
-
 // -----------------------------------------------------------------------------
 // CSphere class definition
 // -----------------------------------------------------------------------------
@@ -43,14 +41,10 @@ private :
     float                   m_radius;
 	float					m_velocity_x;
 	float					m_velocity_z;
-
-	bool moveLeft;
-	bool moveRight;
+	bool					isDeath;
+	bool					isMoving;
 
 public:
-
-	bool isDeath;
-	bool isMoving;
     CSphere(void)
     {
         D3DXMatrixIdentity(&m_mLocal);
@@ -63,10 +57,6 @@ public:
     ~CSphere(void) {}
 
 public:
-
-	void MoveLeft() {
-		moveLeft = true;
-	}
     bool create(IDirect3DDevice9* pDevice, D3DXCOLOR color = d3d::WHITE)
     {
         if (NULL == pDevice)
@@ -78,8 +68,7 @@ public:
         m_mtrl.Emissive = d3d::BLACK;
         m_mtrl.Power    = 5.0f;
 		isMoving = false;
-		moveLeft = false;
-		moveRight = false;
+		isDeath = false;
         if (FAILED(D3DXCreateSphere(pDevice, getRadius(), 50, 50, &m_pSphereMesh, NULL)))
             return false;
         return true;
@@ -123,16 +112,13 @@ public:
 			if (targetpos.z - whitepos.z <= 0 && targetpos.x - whitepos.x >= 0) { theta = -theta; }
 			if (targetpos.z - whitepos.z >= 0 && targetpos.x - whitepos.x <= 0) { theta = PI - theta; } 
 			if (targetpos.z - whitepos.z <= 0 && targetpos.x - whitepos.x <= 0) { theta = PI + theta; } 
-			
 
 			double vel_x = ball.getVelocity_X();
 			double vel_z = ball.getVelocity_Z();
 			double power = sqrt(vel_x * vel_x + vel_z * vel_z);
-
-			//ball.setPower(m_velocity_x,m_velocity_z);
+			
 			ball.setPower(-power * cos(theta), -power * sin(theta));
-			//setPower(vel_x, vel_z);
-
+			
 			destroy();
 		}
 
@@ -165,25 +151,8 @@ public:
 			this->setCenter(tX, cord.y, tZ);
 		}
 		else { this->setPower(0,0);}
-		//this->setPower(this->getVelocity_X() * DECREASE_RATE, this->getVelocity_Z() * DECREASE_RATE);
-		/*double rate = 1 -  (1 - DECREASE_RATE)*timeDiff * 400;
-		if(rate < 0 )
-			rate = 0;
-		this->setPower(getVelocity_X() * rate, getVelocity_Z() * rate);*/
-		
-
 		isDeath = false;
-		moveRight = false;
-		
 	}
-
-
-	void checkMoving(D3DXVECTOR3& cord) {
-		if (!isMoving) {
-			setCenter(cord.x, center_y, center_z);
-		}
-	}
-	
 
 	double getVelocity_X() { return this->m_velocity_x;	}
 	double getVelocity_Z() { return this->m_velocity_z; }
@@ -219,6 +188,16 @@ public:
 			isMoving = false;
 		}
 	}
+	void checkMoving(D3DXVECTOR3& cord) {
+		if (!isMoving) {
+			setCenter(cord.x, center_y, center_z);
+		}
+	}
+	void shoot() {
+		setPower(0, 5);
+		isMoving = true;
+	}
+
 	
 private:
     D3DXMATRIX              m_mLocal;
@@ -626,8 +605,8 @@ private:
 // -----------------------------------------------------------------------------
 CWall	g_legoPlane;
 CWall	g_legowall[4];
-CSphere	g_sphere[4];
-bool g_b_sphere[4];
+CSphere	g_sphere[NUMBER_OF_BALLS];
+bool g_b_sphere[NUMBER_OF_BALLS];
 CSphere	g_main_ball;
 CHandle	g_target_Handle;
 CLight	g_light;
@@ -672,7 +651,7 @@ bool Setup()
 	g_legowall[3].setPosition(-3.06f, 0.12f, 0.0f);
 	g_legowall[3].setVertical(true);
 	   
-	for (i=0;i<4;i++) {
+	for (i=0;i< NUMBER_OF_BALLS;i++) {
 		if (false == g_sphere[i].create(Device, sphereColor[i])) return false;
 		g_sphere[i].setCenter(spherePos[i][0], (float)M_RADIUS , spherePos[i][1]);
 		g_sphere[i].setPower(0,0);
@@ -756,39 +735,32 @@ bool Display(float timeDelta)
 		g_target_Handle.hitBy(g_main_ball);
 
 		for (i = 0; i < 4; i++) {
-			g_legowall[i].hitBy(g_main_ball);
+			g_legowall[i].hitBy(g_main_ball);			
+		}
+		for (i = 0; i < NUMBER_OF_BALLS; i++) {
 			if (!g_b_sphere[i])continue;
 			g_sphere[i].ballUpdate(timeDelta);
-			
+
 		}
 
 		// check whether any two balls hit together and update the direction of balls
-		
-		
-
-		
-
-		for (i = 0; i < 4; i++) {
+		for (i = 0; i < NUMBER_OF_BALLS; i++) {
 			if (!g_b_sphere[i])continue;
 			if (g_sphere[i].hasIntersected(g_main_ball)) g_b_sphere[i] = false;
 			g_sphere[i].ballUpdate(timeDelta);
 			g_sphere[i].hitBy(g_main_ball);
 		}
-
-
-
 		g_main_ball.checkDeath();
-
 		g_main_ball.ballUpdate(timeDelta);
-
 		g_main_ball.checkMoving(g_target_Handle.getCenter());
 		
-
-
 		// draw plane, walls, and spheres
 		g_legoPlane.draw(Device, g_mWorld);
 		for (i=0;i<4;i++) 	{
 			g_legowall[i].draw(Device, g_mWorld);
+		}
+		for (i = 0; i < NUMBER_OF_BALLS; i++) {
+			
 			if (!g_b_sphere[i])continue;
 			g_sphere[i].draw(Device, g_mWorld);
 		}
@@ -824,7 +796,6 @@ LRESULT CALLBACK d3d::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			case VK_LEFT:
 				
 				g_target_Handle.Move(-3,0);
-				//g_main_ball.MoveLeft();
 				break;
 
 			case VK_RIGHT:
@@ -842,11 +813,13 @@ LRESULT CALLBACK d3d::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 }
                 break;
             case VK_SPACE:
-				g_main_ball.setPower(0, 5);
-				g_main_ball.isMoving = true;
-
+				g_main_ball.shoot();
+				break;
+			case 'R':
+				Setup();
 				break;
 			}
+	
 			break;
         }
 		
@@ -856,16 +829,9 @@ LRESULT CALLBACK d3d::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             int new_y = HIWORD(lParam);
 			float dx;
 			float dy;
-			
-            if (LOWORD(wParam) & MK_LBUTTON) {
-				//마우스 왼쪽 버튼
-                
-
-            }
             break;
         }
 	}
-	
 	return ::DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
